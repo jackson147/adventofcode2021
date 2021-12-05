@@ -31,31 +31,37 @@ func readLines(path string) ([]string, error) {
 	return lines, scanner.Err()
 }
 
+type boardMarker struct {
+	value  int
+	marked bool
+}
+
 type board struct {
-	values [][]int
+	values [][]boardMarker
 }
 
 type coordinate struct {
-	x int
-	y int
+	boardNumber int
+	x           int
+	y           int
 }
 
 func main() {
-	lines, err := readLines("/home/rich/git/advent2021/day4/1/example.txt")
+	lines, err := readLines("/home/rich/git/advent2021/day4/1/real.txt")
 	check(err)
 
-	// valueLookups := make(map[int]coordinate)
-
+	valueLookups := make(map[int][]coordinate)
 	boards := make([]board, 0)
 
 	var inputs []int
 
 	//Init the board
-	currentBoard := board{make([][]int, 5)}
+	currentBoard := board{make([][]boardMarker, 5)}
 	for i := range currentBoard.values {
-		currentBoard.values[i] = make([]int, 5)
+		currentBoard.values[i] = make([]boardMarker, 5)
 	}
 
+	boardNumber := 0
 	rowIndex := 0
 	for i, line := range lines {
 		// fmt.Println(line)
@@ -75,12 +81,12 @@ func main() {
 				//Save off the old board
 				boards = append(boards, currentBoard)
 				//Init a new board
-				currentBoard = board{make([][]int, 5)}
+				currentBoard = board{make([][]boardMarker, 5)}
 				for i := range currentBoard.values {
-					currentBoard.values[i] = make([]int, 5)
+					currentBoard.values[i] = make([]boardMarker, 5)
 				}
+				boardNumber++
 			}
-
 			rowIndex = 0
 			continue
 		} else {
@@ -95,7 +101,8 @@ func main() {
 				check(err)
 				newCol := col - colDecrement
 				// fmt.Println(rowIndex, newCol, colValue)
-				currentBoard.values[rowIndex][newCol] = colValue
+				currentBoard.values[rowIndex][newCol] = boardMarker{colValue, false}
+				valueLookups[colValue] = append(valueLookups[colValue], coordinate{boardNumber, rowIndex, newCol})
 			}
 
 			//Got to increment this for each board entry
@@ -108,6 +115,74 @@ func main() {
 		}
 	}
 
-	fmt.Println(inputs)
-	fmt.Println(boards)
+	// fmt.Println(inputs)
+	// fmt.Println(boards)
+	// fmt.Println(valueLookups)
+
+	foundWinner := -1
+	currentNumber := -1
+	for _, input := range inputs {
+		if foundWinner >= 0 {
+			fmt.Println("BOARD ", foundWinner, " WINS!")
+			break
+		}
+
+		currentNumber = input
+		for _, coordinate := range valueLookups[input] {
+			board := (boards[coordinate.boardNumber])
+			board.values[coordinate.x][coordinate.y].marked = true
+			foundWinner = findWinner(boards)
+		}
+	}
+
+	fmt.Println(boards[foundWinner])
+
+	winningBoard := boards[foundWinner]
+
+	sumUnmarked := 0
+	for row := 0; row < 5; row++ {
+		for col := 0; col < 5; col++ {
+			marker := winningBoard.values[row][col]
+			if !marker.marked {
+				sumUnmarked += marker.value
+			}
+		}
+	}
+	fmt.Println(sumUnmarked)
+	fmt.Println(currentNumber)
+	fmt.Println(sumUnmarked * currentNumber)
+
+}
+
+func findWinner(boards []board) int {
+	for boardNum, board := range boards {
+		for row := 0; row < 5; row++ {
+			colMarkedCount := 0
+			for col := 0; col < 5; col++ {
+				marker := board.values[row][col]
+				if marker.marked {
+					colMarkedCount++
+				}
+
+				if colMarkedCount == 5 {
+					return boardNum
+				}
+			}
+		}
+
+		for col := 0; col < 5; col++ {
+			rowMarkedCount := 0
+			for row := 0; row < 5; row++ {
+				marker := board.values[row][col]
+				if marker.marked {
+					rowMarkedCount++
+				}
+
+				if rowMarkedCount == 5 {
+					return boardNum
+				}
+			}
+		}
+	}
+	return -1
 }
