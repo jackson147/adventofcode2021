@@ -6,6 +6,8 @@ import (
 	"os"
 	"strconv"
 	"unicode"
+
+	"github.com/RyanCarrier/dijkstra"
 )
 
 func check(e error) {
@@ -84,8 +86,7 @@ type riskPoint struct {
 	key         string
 	risk        int
 	connections []*riskPoint
-	distance    int
-	previous    string
+	id          int
 }
 
 func printRiskGrid(grid [][]riskPoint) {
@@ -98,13 +99,14 @@ func printRiskGrid(grid [][]riskPoint) {
 }
 
 func main() {
-	lines, err := readLines("/home/rich/git/advent2021/day15/1/example.txt")
-	// lines, err := readLines("/home/rich/git/advent2021/day15/1/real.txt")
+	// lines, err := readLines("/home/rich/git/advent2021/day15/1/example.txt")
+	lines, err := readLines("/home/rich/git/advent2021/day15/1/real.txt")
 	check(err)
 
 	grid := make([][]riskPoint, len(lines))
 
 	//Load the grid
+	id := 0
 	for x, line := range lines {
 		grid[x] = make([]riskPoint, len(line))
 		for y, riskValue := range line {
@@ -112,7 +114,8 @@ func main() {
 			intRiskValue, err := strconv.Atoi(stringRiskValue)
 			check(err)
 			key := strconv.Itoa(x) + strconv.Itoa(y)
-			grid[x][y] = riskPoint{x, y, key, intRiskValue, make([]*riskPoint, 0), 10000000, ""}
+			grid[x][y] = riskPoint{x, y, key, intRiskValue, make([]*riskPoint, 0), id}
+			id++
 		}
 	}
 
@@ -145,99 +148,25 @@ func main() {
 
 	printRiskGrid(grid)
 
-	// fmt.Println(grid[5][5].connections)
+	graph := dijkstra.NewGraph()
 
-	//Begin route calculations
-	visted := dijkstrasShortestPath(grid, "00")
-	printVisted(visted)
-	// displayShortestPath("00", visted)
-
-}
-
-func getMinimum(unvisted map[string]*riskPoint) string {
-	minKey := "not found"
-	minDistance := 10000001 //One higher than default
-	for key, risk := range unvisted {
-		if risk.distance < minDistance {
-			minDistance = risk.distance
-			minKey = key
-		}
-	}
-	return minKey
-}
-
-func printVisted(visited map[string]*riskPoint) {
-	for key, risk := range visited {
-		fmt.Println(key, *risk)
-	}
-}
-
-func dijkstrasShortestPath(grid [][]riskPoint, startNode string) map[string]*riskPoint {
-
-	// # Initialise visited and unvisited lists
-	unvisited := make(map[string]*riskPoint) // Declare unvisited list as empty dictionary
-	visited := make(map[string]*riskPoint)   // Declare visited list as empty dictionary
-
-	// Add every node to the unvisited list
-	for x, row := range grid {
-		for y, risk := range row {
-			unvisited[risk.key] = &grid[x][y]
+	for _, row := range grid {
+		for _, risk := range row {
+			// fmt.Println("Adding Vertex ", risk.id)
+			graph.AddVertex(risk.id)
 		}
 	}
 
-	// fmt.Println(unvisited)
-	// Set the cost of the start node to 0
-	unvisited["00"].distance = 0
-
-	// repeat the following steps until unvisited list is empty
-	finished := false
-	for !finished {
-		if len(unvisited) == 0 {
-			finished = true
-		} else {
-			// Get unvisited node with lowest cost as current node
-			currentNodeKey := getMinimum(unvisited)
-			currentNode := unvisited[currentNodeKey]
-			// Examine neighbours
-
-			for _, neighbour := range currentNode.connections {
-				//Only check unvisited neighbours
-				if _, ok := visited[neighbour.key]; !ok {
-					//Calculate new cost
-					cost := unvisited[currentNodeKey].distance + grid[currentNode.x][currentNode.y].distance
-					// Check if new cost is less
-					if cost < unvisited[neighbour.key].distance {
-						unvisited[neighbour.key].distance = cost
-						unvisited[neighbour.key].previous = neighbour.key
-					}
-				}
+	for _, row := range grid {
+		for _, risk := range row {
+			for _, connection := range risk.connections {
+				// fmt.Println(risk.id, connection.id, int64(connection.risk))
+				graph.AddArc(risk.id, connection.id, int64(connection.risk))
 			}
-
-			// Add current node to visited list
-			visited[currentNode.key] = unvisited[currentNode.key]
-			// Remove from unvisited list
-			delete(unvisited, currentNode.key)
 		}
 	}
 
-	return visited
-}
-
-func displayShortestPath(start string, visited map[string]*riskPoint) {
-	for key := range visited {
-		fmt.Println(key)
-		if key != start {
-			current := key
-			path := current
-			for current != start {
-				previous := visited[current].previous
-				path = previous + path
-				current = visited[current].previous
-				fmt.Println(path)
-			}
-			fmt.Println("Path for: " + key)
-			fmt.Println(path)
-			fmt.Println("Cost: " + strconv.Itoa(visited[key].distance))
-		}
-	}
+	best, err := graph.Shortest(0, len(lines)*len(lines)-1)
+	check(err)
+	fmt.Println("Shortest distance ", best.Distance, " following path ", best.Path)
 }
